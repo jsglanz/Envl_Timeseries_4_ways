@@ -1,4 +1,4 @@
-![](images/si_SMSFP_rgb_horizontal_color.jpg)
+![](si_SMSFP_rgb_horizontal_color.jpg)
 
 # Quarterly Comparison
 
