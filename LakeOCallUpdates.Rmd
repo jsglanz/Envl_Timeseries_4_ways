@@ -1,0 +1,380 @@
+---
+title: "Lake O Call Updates - Select Environmental Parameters"
+author: "Jess S. Glanz | SMS-BEL Program Coordinator | jess.glanz@gmail.com"
+date: "8 Mar 2023"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+mainfont: SourceSansPro
+header-includes:
+- \usepackage[default]{sourcesanspro}
+- \usepackage[T1]{fontenc}
+---
+## Load the packages
+
+```{r LoadPackages, results="hide",message=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggprism)
+```
+
+## Load the data 
+
+Load past years' data and current quarter's data.
+
+```{r LoadData1, results="hide",message=FALSE,warning=FALSE}
+ec<-read_excel("~/Desktop/SMS-BEL/SMS-EnvlAnalysis/Data/20221102_UpToOct22Env (1).xlsx") 
+
+jan23e<-read_excel("~/Desktop/SMS-BEL/SMS-EnvlAnalysis/Data/2023.01.09_Jan23EnvlData.xlsx",sheet=2) 
+```
+
+## Tidy the data
+
+Rename and convert turbidity, bottom salinity, bottom oxygen, and bottom temperature values to numeric.
+
+```{r SelectNeededCols, results="hide",message=FALSE,warning=FALSE}
+ec$turb<-as.numeric(ec$`Turbidity (NTU)`)
+ec$bs<-as.numeric(ec$`Bottom salinity (ppt)`)
+ec$bo<-as.numeric(ec$`Bottom oxygen`)
+
+jan23e$turb<-as.numeric(jan23e$`Turbidity (NTU)`)
+jan23e$bs<-as.numeric(jan23e$`Bottom salinity (ppt)`)
+jan23e$bo<-as.numeric(jan23e$`Bottom oxygen`)
+```
+
+Add a column that codes sediment firmness as a numeric variable.
+
+```{r RenameColumns, results="hide",message=FALSE,warning=FALSE}
+ec<-ec %>% mutate(sf =
+                     case_when(Firmness == "very_soft" ~ 1, 
+                               Firmness == "soft" ~ 2,
+                               Firmness == "medium_stiff" ~ 3,
+                               Firmness == "stiff" ~ 4,
+                               Firmness == "very_Stiff" ~ 5))
+
+jan23e<-jan23e %>% mutate(sf =
+                    case_when(Firmness == "very_soft" ~ 1, 
+                              Firmness == "soft" ~ 2,
+                              Firmness == "medium_stiff" ~ 3,
+                              Firmness == "stiff" ~ 4,
+                              Firmness == "very_Stiff" ~ 5))
+```
+
+
+Add a column for Quarter based on the numeric value of the month when sampling was performed.
+
+```{r AddQ, results="hide",message=FALSE,warning=FALSE}
+ec<-ec %>% mutate(Q =
+                            case_when(M == 1 ~ 1, 
+                                      M == 2 ~ 1, 
+                                      M == 4 ~ 2, 
+                                      M == 5 ~ 2,
+                                      M == 6 ~ 3,
+                                      M == 7 ~ 3,
+                                      M == 9 ~ 4,
+                                      M == 10 ~ 4))
+
+jan23e <- jan23e %>%
+  add_column(Q = 1) 
+```
+
+## Calculate the 95% CIs for one parameter at a time by site and quarter.
+
+Turbidity: Calculate the mean, standard deviation, and n by site and quarter.
+
+```{r separateCurrentHistorical, results="hide",message=FALSE,warning=FALSE}
+turbsq <- ec %>%
+  group_by(Site,Q) %>%
+  summarize(mean=mean(turb, na.rm=TRUE), s=sd(turb, na.rm=TRUE), n=length(na.omit(turb)))
+```
+
+Calculate the margin of error by site and quarter.
+
+```{r summaryofmean, results="hide",message=FALSE,warning=FALSE}
+turbs<-turbsq%>%group_by(Site,Q)%>%
+  summarize(marg=qt(0.975,df=n-1)*s/sqrt(n))
+```
+
+Bind the margin of error data with the calculated means and rename the added column "mean".
+
+```{r quarterlytickmarkswolabels, results="hide",message=FALSE,warning=FALSE}
+t<-cbind(turbs, turbsq$mean)
+
+t<-t%>%rename(mean=`...4`)
+```
+
+Calculate the 95% CIs by subtracting and adding the margin of error from and to the calculated mean by site and quarter.
+
+```{r marginoferror, results="hide",message=FALSE,warning=FALSE}
+t2<-t%>%group_by(Site,Q)%>%
+  summarize(tlo=mean-marg,thi=mean+marg)
+```
+
+Repeat for the remaining parameters (salinity, oxygen, and sediment firmness).
+
+```{r mergeandrename, results="hide",message=FALSE,warning=FALSE}
+#Salinity
+bssq <- ec %>%
+  group_by(Site, Q) %>%
+  summarize(mean=mean(bs, na.rm=TRUE), s=sd(bs, na.rm=TRUE), n=length(na.omit(bs)))
+
+bss<-bssq%>%group_by(Site,Q)%>%
+  summarize(marg=qt(0.975,df=n-1)*s/sqrt(n))
+
+bs1<-cbind(bss, bssq$mean)
+bs1<-bs1%>%rename(mean=`...4`)
+
+bs2<-bs1%>%group_by(Site,Q)%>%
+  summarize(slo=mean-marg,shi=mean+marg)
+
+
+#Oxygen
+bosq <- ec %>%
+  group_by(Site, Q) %>%
+  summarize(mean=mean(bo, na.rm=TRUE), s=sd(bo, na.rm=TRUE), n=length(na.omit(bo)))
+
+bos<-bosq%>%group_by(Site,Q)%>%
+  summarize(marg=qt(0.975,df=n-1)*s/sqrt(n))
+
+bo1<-cbind(bos, bosq$mean)
+bo1<-bo1%>%rename(mean=`...4`)
+
+bo2<-bo1%>%group_by(Site,Q)%>%
+  summarize(olo=mean-marg,ohi=mean+marg)
+
+
+#Sediment Firmness
+sfsq <- ec %>%
+  group_by(Site, Q) %>%
+  summarize(mean=mean(sf, na.rm=TRUE), s=sd(sf, na.rm=TRUE), n=length(na.omit(sf)))
+
+sfs<-sfsq%>%group_by(Site,Q)%>%
+  summarize(marg=qt(0.975,df=n-1)*s/sqrt(n))
+
+sf1<-cbind(sfs, sfsq$mean)
+sf1<-sf1%>%rename(mean=`...4`)
+
+sf2<-sf1%>%group_by(Site,Q)%>%
+  summarize(flo=mean-marg,fhi=mean+marg)
+```
+
+Bind all of those datasets together and rename the respective newly bound columns.
+
+```{r mypalette, results="hide",message=FALSE,warning=FALSE}
+tso <- cbind(t2, bs2$slo)
+tso <- cbind(tso, bs2$shi)
+tso <- cbind(tso, bo2$olo)
+tso <- cbind(tso, bo2$ohi)
+tso <- cbind(tso, sf2$flo)
+tso <- cbind(tso, sf2$fhi)
+
+tso <- tso%>%
+  rename(slo = `...5`,
+         shi = `...6`,
+         olo=`...7`,
+         ohi=`...8`,
+         flo=`...9`,
+         fhi=`...10`)
+```
+
+Then, filter for the current quarter. Change the number after Q== to reflect the current quarter. (1 = Jan, 2 = Apr, 3 = Jul, 4 = Oct)
+
+```{r obtainCIs, results="hide",message=FALSE,warning=FALSE}
+tso2<-tso%>%filter(Q==1)
+```
+
+Then, bind the current quarter's data to the `tso2` dataframe and rename those bound columns.
+
+```{r repeatabove, results="hide",message=FALSE,warning=FALSE}
+tso2 <- cbind(tso2, jan23e$turb)
+tso2 <- cbind(tso2, jan23e$bs)
+tso2 <- cbind(tso2, jan23e$bo)
+tso2 <- cbind(tso2, jan23e$sf)
+
+tso2 <- tso2%>%
+  rename(turb = `...11`,
+         bs = `...12`,
+         bo=`...13`,
+         sf=`...14`)
+```
+
+## Plot the turbidity data.
+
+```{r turbplot, results="hide",message=FALSE,warning=FALSE}
+turb0123<-tso2 %>%
+  mutate(Site = factor(Site, levels=c("M15","M01","M02","M14","M04","M03","M05","M06",
+         "M07","M08","M09","M10","M11","M12","M13"))) %>%
+  ggplot( aes(x=Site, y=turb)) +
+  geom_segment( aes(xend=Site,y=tlo, yend=thi),color="grey",alpha=0.6,size=8) +
+  geom_point( size=4, color="black",fill="black",shape=15) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "none")+
+  theme(axis.text.x=element_text(face="bold",colour=c("#471164","#471164","#471164", "#471164",     
+  "#471164","#F98400","#F98400","#F98400","#F98400","#46ACC8", "#46ACC8", "#46ACC8",
+  "#46ACC8", "#46ACC8", "#46ACC8" )),
+        plot.margin = margin(0.1, 0, 0, 0.1, "cm"))+
+  labs(x=NULL, y=NULL)+ 
+  ggtitle("Turbidity (NTU)") +
+  theme(plot.title = element_text(hjust = 0.5,size=14))+
+  scale_x_discrete(guide = guide_prism_bracket(outside=FALSE))
+```
+  
+Save the plot as a jpg.
+
+```{r saveturb, results="hide",message=FALSE,warning=FALSE}
+ggsave(
+  "Jan23_Turb.jpg",#file name
+  plot = turb0123,#plot to save, defaults to last plot displayed
+  device = "jpg",#file format (jpg, pdf, png, eps, etc)
+  path = NULL, #defaults to working directory
+  scale = 1,
+  width =12,
+  height = 8,
+  units = "cm", #c("in", "cm", "mm", "px")
+  dpi = 300,
+  limitsize = TRUE)
+```
+
+## Plot the salinity data.
+```{r salplot, results="hide",message=FALSE,warning=FALSE}
+sal0123<-tso2 %>%
+  mutate(Site = factor(Site, levels=c("M15","M01","M02","M14","M04","M03","M05","M06",
+         "M07","M08","M09","M10","M11","M12","M13"))) %>%
+  ggplot( aes(x=Site, y=bs)) +
+  geom_segment( aes(xend=Site,y=slo, yend=shi),color="grey",alpha=0.6,size=8) +
+  geom_point( size=4, color="black",fill="black",shape=15) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "none")+
+ theme(axis.text.x=element_text(face="bold",colour=c("#471164","#471164","#471164", "#471164",     
+  "#471164","#F98400","#F98400","#F98400","#F98400","#46ACC8", "#46ACC8", "#46ACC8",
+  "#46ACC8", "#46ACC8", "#46ACC8" )),
+        plot.margin = margin(0.1, 0, 0, 0.1, "cm"))+
+  labs(x=NULL, y=NULL)+ 
+  ggtitle("Salinity (ppt)") +
+  theme(plot.title = element_text(hjust = 0.5,size=14))+
+  scale_x_discrete(guide = guide_prism_bracket(outside=FALSE))
+```
+
+Save the plot as a jpg.
+
+```{r savesal, results="hide",message=FALSE,warning=FALSE}
+ggsave(
+  "Jan23_Sal.jpg",#file name
+  plot = sal0123,#plot to save, defaults to last plot displayed
+  device = "jpg",#file format (jpg, pdf, png, eps, etc)
+  path = NULL, #defaults to working directory
+  scale = 1,
+  width =12,
+  height = 8,
+  units = "cm", #c("in", "cm", "mm", "px")
+  dpi = 300,
+  limitsize = TRUE)
+```
+
+## Plot the oxygen data.
+```{r boplot, results="hide",message=FALSE,warning=FALSE}
+bo0123<-tso2 %>%
+  mutate(Site = factor(Site, levels=c("M15","M01","M02","M14","M04","M03","M05","M06",
+         "M07","M08","M09","M10","M11","M12","M13"))) %>%
+  ggplot( aes(x=Site, y=bo)) +
+  geom_segment( aes(xend=Site,y=olo, yend=ohi),color="grey",alpha=0.6,size=8) +
+  geom_point( size=4, color="black",fill="black",shape=15) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "none")+
+  theme(axis.text.x=element_text(face="bold",colour=c("#471164","#471164","#471164", "#471164",     
+  "#471164","#F98400","#F98400","#F98400","#F98400","#46ACC8", "#46ACC8", "#46ACC8",
+  "#46ACC8", "#46ACC8", "#46ACC8" )),
+        plot.margin = margin(0.1, 0, 0, 0.1, "cm"))+
+  labs(x=NULL, y=NULL)+ 
+  ggtitle("Dissolved Oxygen (mg/L)") +
+  theme(plot.title = element_text(hjust = 0.5,size=14))+
+  scale_x_discrete(guide = guide_prism_bracket(outside=FALSE))
+```
+
+Save the plot as a jpg.
+
+```{r savebo, results="hide",message=FALSE,warning=FALSE}
+ggsave(
+  "Jan23_BDO.jpg",#file name
+  plot = bo0123,#plot to save, defaults to last plot displayed
+  device = "jpg",#file format (jpg, pdf, png, eps, etc)
+  path = NULL, #defaults to working directory
+  scale = 1,
+  width =12,
+  height = 8,
+  units = "cm", #c("in", "cm", "mm", "px")
+  dpi = 300,
+  limitsize = TRUE)
+```
+
+## Plot the sediment firmness data.
+
+First, convert the sediment firmness variable into a factor for plotting purposes.
+
+```{r convertsf, results="hide",message=FALSE,warning=FALSE}
+tso2$sf<-as.factor(tso2$sf)
+```
+
+Plot sediment firmness.
+
+```{r plotsf, results="hide",message=FALSE,warning=FALSE}
+sf0123<-tso2 %>%
+  mutate(Site = factor(Site, levels=c("M15","M01","M02","M14","M04","M03","M05","M06",
+         "M07","M08","M09","M10","M11","M12","M13"))) %>%
+  ggplot( aes(x=Site, y=sf)) +
+  geom_segment( aes(xend=Site,y=flo, yend=fhi),color="grey",alpha=0.6,size=8) +
+  geom_point( size=4, color="black",fill="black",shape=15) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  scale_y_discrete(labels = c("Very Soft","Soft", "Med Stiff","Stiff","Very Stiff"))+
+  scale_x_discrete(guide = guide_prism_bracket(outside=FALSE))+
+  theme(axis.text.y = element_text(angle = 45))+
+  theme(legend.position = "none")+
+  theme(axis.text.x=element_text(face="bold",colour=c("#471164","#471164","#471164", "#471164",     
+  "#471164","#F98400","#F98400","#F98400","#F98400","#46ACC8", "#46ACC8", "#46ACC8",
+  "#46ACC8", "#46ACC8", "#46ACC8" )),
+        plot.margin = margin(0.1, 0, 0, 0.1, "cm"))+
+  labs(x=NULL, y=NULL)+ 
+  ggtitle("Sediment Firmness") +
+  theme(plot.title = element_text(hjust = 0.5,size=14))
+```
+
+Save the plot.
+
+```{r savesf, results="hide",message=FALSE,warning=FALSE}
+ggsave(
+  "Jan23_SedFirmness.jpg",#file name
+  plot = sf0123,#plot to save, defaults to last plot displayed
+  device = "jpg",#file format (jpg, pdf, png, eps, etc)
+  path = NULL, #defaults to working directory
+  scale = 1,
+  width =12,
+  height = 8,
+  units = "cm", #c("in", "cm", "mm", "px")
+  dpi = 300,
+  limitsize = TRUE)
+```
+
+
+```{r checktuplot, fig.height = 3.15, fig.width = 4.72, out.width = "100%", echo=FALSE,message=FALSE,warning=FALSE}
+turb0123
+```
+
+```{r checksaplot, fig.height = 3.15, fig.width = 4.72, out.width = "100%", echo=FALSE,message=FALSE,warning=FALSE}
+sal0123
+```
+
+```{r checkboplot, fig.height = 3.15, fig.width = 4.72, out.width = "100%", echo=FALSE,message=FALSE,warning=FALSE}
+bo0123
+```
+
+```{r checksfplot, fig.height = 3.15, fig.width = 4.72, out.width = "100%", echo=FALSE,message=FALSE,warning=FALSE}
+sf0123
+```
