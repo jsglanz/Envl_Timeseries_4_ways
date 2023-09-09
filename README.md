@@ -2,7 +2,7 @@
 
 # Quarterly Comparison
 
-This repo contains code and output for a few of the visuals created for the Smithsonian Marine Station Benthic Ecology Lab's (SMS-BEL) quarterly updates presented during Lake Okeechobee Periodic Scientist Calls and annual reports submitted to the United States Army Corps of Engineers and the South Florida Water Management District.
+This repo contains code and output (in Rmarkdown pdf files) for a few of the visuals created for the Smithsonian Marine Station Benthic Ecology Lab's (SMS-BEL) quarterly updates presented during Lake Okeechobee Periodic Scientist Calls and annual reports submitted to the United States Army Corps of Engineers and the South Florida Water Management District.
 
 Including:
 
